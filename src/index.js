@@ -14,6 +14,7 @@ import { Prober } from './prober.js';
 import { TUI } from './tui.js';
 import { SxManager } from './sx.js';
 import { autoUpdate, checkForUpdate, currentVersion, runUpdate, installKind, PKG_NAME } from './updater.js';
+import * as shim from './shim.js';
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -81,6 +82,10 @@ switch (command) {
   case '--version':
   case '-V':
     console.log(currentVersion() || 'unknown');
+    process.exit(0);
+    break;
+  case 'shim':
+    await shimCommand();
     process.exit(0);
     break;
   case 'help':
@@ -821,6 +826,34 @@ async function updateCommand() {
   }
 }
 
+// ── shim ────────────────────────────────────────────────────
+
+async function shimCommand() {
+  const sub = args[1];
+  const shimDir = argValue('--shim-dir') || undefined;
+
+  switch (sub) {
+    case 'install': {
+      const noRc = args.includes('--no-rc');
+      shim.install({ shimDir, noRc });
+      break;
+    }
+    case 'uninstall': {
+      shim.uninstall({ shimDir });
+      break;
+    }
+    case 'status':
+    case undefined: {
+      shim.status({ shimDir });
+      break;
+    }
+    default:
+      console.error(`Unknown shim action: ${sub}`);
+      console.error('Usage: teamclaude shim [install|uninstall|status] [--no-rc] [--shim-dir PATH]');
+      process.exit(1);
+  }
+}
+
 // ── remove ──────────────────────────────────────────────────
 
 /**
@@ -962,6 +995,9 @@ Commands:
   api <path>          Call an API endpoint with account credentials
   update              Check npm for a newer teamclaude and install it
   version             Print the installed version
+  shim <action>       Install a transparent claude shim that auto-routes
+                      through the proxy when it's running
+                      (install | uninstall | status)
   help                Show this help
 
 Options:

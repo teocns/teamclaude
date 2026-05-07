@@ -161,7 +161,47 @@ teamclaude alias              # print the alias for your shell
 teamclaude alias --install    # or write it to your shell rc (--uninstall to remove)
 ```
 
-This is an interactive-shell alias — it affects `claude` typed at a prompt, not `claude` spawned by editors or scripts. It's a thin passthrough to `teamclaude run`, which holds the proxy-up/down logic.
+This is an interactive-shell alias — it affects `claude` typed at a prompt, not `claude` spawned by editors or scripts. It's a thin passthrough to `teamclaude run`, which holds the proxy-up/down logic. For non-interactive contexts (scripts, editors, SDK, cron), use the transparent shim below instead.
+
+### Transparent shim
+
+`teamclaude run` works for one-off invocations, but if you want plain `claude` to route through the proxy automatically — without prefixing every call — install the shim:
+
+```bash
+teamclaude shim install
+```
+
+This drops a small bash wrapper at `$XDG_DATA_HOME/teamclaude-shim/claude`, alongside `env` (sh / bash / zsh) and `env.fish` (fish) loaders. Each detected shell rc gets a single one-line directive sourcing the loader — same pattern rustup uses with `~/.cargo/env`. From then on, every `claude` invocation:
+
+1. Probes the proxy port locally.
+2. **Up** → applies `teamclaude env` and execs the real `claude`.
+3. **Down** → execs the real `claude` directly.
+
+The shim lives in its own directory, separate from where Claude Code's auto-updater writes its binary. So `claude` updates can come and go without disturbing the shim — same trick `rbenv`, `asdf`, and `mise` use to survive language-version updates.
+
+```bash
+teamclaude shim status     # Show install state and which rc files are wired up
+teamclaude shim uninstall  # Revert (removes shim files + cleans rc edits)
+```
+
+Shells covered:
+
+- **bash** — `~/.bashrc` and `~/.bash_profile` (handles macOS Terminal's login-shell precedence)
+- **zsh** — `~/.zshrc`
+- **POSIX sh** — `~/.profile` (login-shell baseline; helps display managers, etc.)
+- **fish** — `~/.config/fish/conf.d/teamclaude-shim.fish` (auto-loaded; no rc edit)
+
+The sourced loaders are idempotent at source time (they check whether the shim dir is already on `PATH`) so reload-after-reload is safe.
+
+Flags:
+
+- `--no-rc` — skip rc edits; print the source lines for manual install.
+- `--shim-dir PATH` — override the install directory (default `$XDG_DATA_HOME/teamclaude-shim`).
+
+Shim runtime env vars:
+
+- `CLAUDE_REAL` — force a specific real-claude binary path (skips PATH walk).
+- `TEAMCLAUDE_CONFIG` — override the teamclaude config path used to read the proxy port.
 
 ### Other commands
 
@@ -175,6 +215,7 @@ teamclaude enable <name>     # Re-enable it (also clears a stuck error state)
 teamclaude priority <name> 1 # Set rotation priority (lower = preferred)
 teamclaude probe 300         # Enable background quota refresh (off by default)
 teamclaude alias             # Print/install a `claude` alias that routes via the proxy
+teamclaude shim status       # Show shim installation status
 teamclaude api <path>        # Call an API endpoint with account credentials
 teamclaude update            # Check npm for a newer teamclaude and install it
 teamclaude version           # Print the installed version
