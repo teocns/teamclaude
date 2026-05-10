@@ -835,7 +835,7 @@ async function shimCommand() {
   switch (sub) {
     case 'install': {
       const noRc = args.includes('--no-rc');
-      shim.install({ shimDir, noRc });
+      await shim.install({ shimDir, noRc });
       break;
     }
     case 'uninstall': {
